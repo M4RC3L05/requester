@@ -1,0 +1,26 @@
+{
+  "name": "@m4rc3l05/requester",
+  "version": "0.0.0",
+  "tasks": {
+    "deps:lock": "deno cache --lock=deno.lock --lock-write src/*.ts src/**/*.ts",
+    "deps": "deno cache --reload --lock=deno.lock src/*.ts src/**/*.ts"
+  },
+  "exports": {
+    ".": "./src/mod.ts",
+    "./composers": "./src/composers/mod.ts"
+  },
+  "publish": {
+    "include": [
+      "./src/*.ts",
+      "./src/composers/*.ts",
+      "LICENSE",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "./src/*_test.ts",
+      "./src/composers/*_test.ts",
+      "./src/test_deps.ts"
+    ]
+  }
+}
