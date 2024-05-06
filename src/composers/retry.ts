@@ -20,13 +20,11 @@ const normalizeOptions = (options?: RetryOptions): Required<RetryOptions> => {
 
 export const retry = (
   options?: RetryOptions,
-): Composer =>
-(fetchImpl) => {
-  let currentTry = 0;
-
+): Composer => {
   const { maxRetries, shouldRetry } = normalizeOptions(options);
 
-  return async (input, init) => {
+  return (fetchImpl) => async (input, init) => {
+    let currentTry = 0;
     let response: Response | undefined;
     let error: Error | undefined;
 

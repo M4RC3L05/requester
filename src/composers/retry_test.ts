@@ -73,4 +73,37 @@ describe("retry()", () => {
     assertEquals(response, "foo" as any);
     assertEquals(retrySpy.calls.length, 1);
   });
+
+  it("should allow to execute multiple times", async () => {
+    const fetchSpy = spy(() => "foo");
+    const retrySpy = spy((() => {
+      let i = 0;
+      return () => {
+        i += 1;
+
+        if (i < 3) return true;
+
+        i = 0;
+        return false;
+      };
+    })());
+
+    const retryFn = retry({ maxRetries: 5, shouldRetry: retrySpy })(
+      fetchSpy as any,
+    );
+
+    {
+      const response = await retryFn("");
+
+      assertEquals(response, "foo" as any);
+      assertEquals(retrySpy.calls.length, 3);
+    }
+
+    {
+      const response = await retryFn("");
+
+      assertEquals(response, "foo" as any);
+      assertEquals(retrySpy.calls.length, 6);
+    }
+  });
 });
