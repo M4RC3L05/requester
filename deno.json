@@ -1,6 +1,6 @@
 {
   "name": "@m4rc3l05/requester",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "tasks": {
     "deps:lock": "deno cache --lock=deno.lock --lock-write src/*.ts src/**/*.ts",
     "deps": "deno cache --reload --lock=deno.lock src/*.ts src/**/*.ts"
