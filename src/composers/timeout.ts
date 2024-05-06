@@ -3,12 +3,13 @@ import type { Composer } from "../types.ts";
 export const timeout =
   (options: { ms: number }): Composer => (fetchImpl) => (input, init) => {
     const timeoutSignal = AbortSignal.timeout(options.ms);
+    let clonedInit = init ? { ...init } : init;
 
-    if (init) {
-      init.signal = init.signal
-        ? AbortSignal.any([init.signal, timeoutSignal])
+    if (clonedInit) {
+      clonedInit.signal = clonedInit.signal
+        ? AbortSignal.any([clonedInit.signal, timeoutSignal])
         : timeoutSignal;
-    } else init = { signal: timeoutSignal };
+    } else clonedInit = { signal: timeoutSignal };
 
-    return fetchImpl(input, init);
+    return fetchImpl(input, clonedInit);
   };

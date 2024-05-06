@@ -13,14 +13,18 @@ describe("Requester", () => {
     });
     const composerOne = spy<any, Parameters<Composer>, ReturnType<Composer>>(
       (f) => {
-        stack.push(1);
-        return (a, b) => f(a, b);
+        return (a, b) => {
+          stack.push(1);
+          return f(a, b);
+        };
       },
     );
     const composerTwo = spy<any, Parameters<Composer>, ReturnType<Composer>>(
       (f) => {
-        stack.push(2);
-        return (a, b) => f(a, b);
+        return (a, b) => {
+          stack.push(2);
+          return f(a, b);
+        };
       },
     );
 
@@ -31,7 +35,7 @@ describe("Requester", () => {
 
     const response = await requester("foo");
 
-    assertEquals(stack, [1, 2, 3]);
+    assertEquals(stack, [2, 1, 3]);
     assertEquals(response, "foo");
   });
 });

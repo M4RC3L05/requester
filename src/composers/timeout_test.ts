@@ -49,4 +49,22 @@ describe("timeout()", () => {
     abortSignalTimeoutStub.restore();
     abortSignalAnyStub.restore();
   });
+
+  it("should not mutate init if one is provided", async () => {
+    const fetchSpy = spy();
+    const abortSignalTimeoutStub = stub(
+      AbortSignal,
+      "timeout",
+      () => "foo" as any,
+    );
+    const init = {};
+
+    await timeout({ ms: 1000 })(fetchSpy as any as Fetch)("", init);
+
+    assertEquals(init, {});
+    assertEquals(fetchSpy.calls.length, 1);
+    assertEquals(fetchSpy.calls[0].args, ["", { signal: "foo" }]);
+
+    abortSignalTimeoutStub.restore();
+  });
 });
