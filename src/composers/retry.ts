@@ -4,16 +4,24 @@ type RetryOptions = {
   shouldRetry?: (data: { response?: Response; error?: Error }) => boolean;
   maxRetries?: number;
   retryDelay?: number;
+  unrefRetryDelay?: boolean;
+  retryDelayAbortSignal?: AbortSignal;
 };
 
-type DefaultRetryOptions = Required<
-  Pick<RetryOptions, "maxRetries" | "retryDelay" | "shouldRetry">
->;
+type DefaultRetryOptions =
+  & Required<
+    Pick<
+      RetryOptions,
+      "maxRetries" | "retryDelay" | "shouldRetry" | "unrefRetryDelay"
+    >
+  >
+  & Partial<Pick<RetryOptions, "retryDelayAbortSignal">>;
 
 const optionsDefaults: DefaultRetryOptions = {
   maxRetries: 3,
   shouldRetry: ({ error }) => !!error,
   retryDelay: 0,
+  unrefRetryDelay: false,
 };
 
 const checkMethod = (obj: unknown, method: string) =>
@@ -41,6 +49,7 @@ const normalizeOptions = (options?: RetryOptions): DefaultRetryOptions => {
 
   if (withDefaults.maxRetries < 1) withDefaults.maxRetries = 1;
   if (withDefaults.retryDelay < 0) withDefaults.retryDelay = 0;
+  if (!withDefaults.unrefRetryDelay) withDefaults.unrefRetryDelay = false;
 
   return withDefaults;
 };
@@ -48,7 +57,8 @@ const normalizeOptions = (options?: RetryOptions): DefaultRetryOptions => {
 export const retry = (
   options?: RetryOptions,
 ): Composer => {
-  const { maxRetries, shouldRetry, retryDelay } = normalizeOptions(options);
+  const { maxRetries, shouldRetry, retryDelay, unrefRetryDelay } =
+    normalizeOptions(options);
 
   return (fetchImpl) => async (input, init) => {
     let currentTry = 0;
@@ -62,12 +72,24 @@ export const retry = (
       currentTry += 1;
 
       // Apply delay on retries and if retry delay is not 0 and the request was not aborted.
-      if (currentTry > 1 && retryDelay > 0 && !init?.signal?.aborted) {
+      if (currentTry > 1 && retryDelay > 0 && !(init?.signal?.aborted)) {
         await new Promise<void>((resolve) => {
-          const i = setTimeout(resolve, retryDelay);
+          const onAbort = () => {
+            resolve();
+            clearTimeout(i);
+          };
+
+          const i = setTimeout(() => {
+            init?.signal?.removeEventListener("abort", onAbort);
+
+            resolve();
+          }, retryDelay);
+
           timers.push(i);
 
-          unrefTimer(i);
+          if (unrefRetryDelay) unrefTimer(i);
+
+          init?.signal?.addEventListener("abort", onAbort, { once: true });
         });
       }
 
