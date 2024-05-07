@@ -1,5 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals, describe, fail, it, spy } from "../test_deps.ts";
+import {
+  assertEquals,
+  describe,
+  fail,
+  FakeTime,
+  it,
+  spy,
+  stub,
+} from "../test_deps.ts";
 import { retry } from "./mod.ts";
 
 describe("retry()", () => {
@@ -105,5 +113,95 @@ describe("retry()", () => {
       assertEquals(response, "foo" as any);
       assertEquals(retrySpy.calls.length, 6);
     }
+  });
+
+  it("should apply a retry delay", async () => {
+    const time = new FakeTime(0);
+    const unrefSpy = spy();
+    const unrefTimerStub = stub(Deno, "unrefTimer", unrefSpy);
+    const fetchSpy = spy(() => "foo");
+
+    const p = retry({
+      maxRetries: 5,
+      shouldRetry: () => true,
+      retryDelay: 3000,
+    })(
+      fetchSpy as any,
+    )("");
+
+    assertEquals(fetchSpy.calls.length, 1);
+    assertEquals(unrefSpy.calls.length, 0);
+    await time.tickAsync(3000);
+    assertEquals(fetchSpy.calls.length, 2);
+    assertEquals(unrefSpy.calls.length, 1);
+    await time.tickAsync(2999);
+    assertEquals(fetchSpy.calls.length, 2);
+    assertEquals(unrefSpy.calls.length, 2);
+    await time.tickAsync(1);
+    assertEquals(fetchSpy.calls.length, 3);
+    assertEquals(unrefSpy.calls.length, 2);
+    await time.tickAsync(3000);
+    assertEquals(fetchSpy.calls.length, 4);
+    assertEquals(unrefSpy.calls.length, 3);
+    await time.tickAsync(3000);
+    assertEquals(fetchSpy.calls.length, 5);
+    assertEquals(unrefSpy.calls.length, 4);
+
+    try {
+      await p;
+
+      fail("should have thrown");
+    } catch (error) {
+      assertEquals(error.message, 'Max retries of "5" reached');
+    }
+
+    unrefTimerStub.restore();
+    time.restore();
+  });
+
+  it("should not apply a retry delay if request was already aborted", async () => {
+    const time = new FakeTime(0);
+    const unrefSpy = spy();
+    const unrefTimerStub = stub(Deno, "unrefTimer", unrefSpy);
+    const fetchSpy = spy((_, { signal }) => {
+      if (signal?.aborted) throw new Error("Aborted");
+      return "foo";
+    });
+    const ab = new AbortController();
+
+    try {
+      const p = retry({
+        maxRetries: 5,
+        shouldRetry: () => true,
+        retryDelay: 3000,
+      })(
+        fetchSpy as any,
+      )("", { signal: ab.signal });
+
+      assertEquals(fetchSpy.calls.length, 1);
+      assertEquals(unrefSpy.calls.length, 0);
+      await time.tickAsync(3000);
+      assertEquals(fetchSpy.calls.length, 2);
+      assertEquals(unrefSpy.calls.length, 1);
+      await time.tickAsync(2999);
+      assertEquals(fetchSpy.calls.length, 2);
+      assertEquals(unrefSpy.calls.length, 2);
+      await time.tickAsync(1);
+      assertEquals(fetchSpy.calls.length, 3);
+      assertEquals(unrefSpy.calls.length, 2);
+
+      ab.abort();
+      await p;
+
+      fail("should have thrown");
+    } catch (error) {
+      assertEquals(error.message, 'Max retries of "5" reached');
+    }
+
+    assertEquals(fetchSpy.calls.length, 5);
+    assertEquals(unrefSpy.calls.length, 2);
+
+    unrefTimerStub.restore();
+    time.restore();
   });
 });
