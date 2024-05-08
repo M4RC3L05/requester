@@ -3,53 +3,19 @@ import type { Composer } from "../types.ts";
 type RetryOptions = {
   shouldRetry?: (data: { response?: Response; error?: Error }) => boolean;
   maxRetries?: number;
-  retryDelay?: number;
-  unrefRetryDelay?: boolean;
-  retryDelayAbortSignal?: AbortSignal;
 };
 
-type DefaultRetryOptions =
-  & Required<
-    Pick<
-      RetryOptions,
-      "maxRetries" | "retryDelay" | "shouldRetry" | "unrefRetryDelay"
-    >
-  >
-  & Partial<Pick<RetryOptions, "retryDelayAbortSignal">>;
+type DefaultRetryOptions = Required<RetryOptions>;
 
 const optionsDefaults: DefaultRetryOptions = {
   maxRetries: 3,
   shouldRetry: ({ error }) => !!error,
-  retryDelay: 0,
-  unrefRetryDelay: false,
-};
-
-const checkMethod = (obj: unknown, method: string) =>
-  typeof obj === "object" && obj !== null &&
-  // deno-lint-ignore ban-ts-comment
-  // @ts-ignore
-  typeof obj[method] === "function";
-
-const unrefTimer = (timer?: unknown) => {
-  try {
-    if (
-      checkMethod(globalThis?.Deno, "unrefTimer") && typeof timer === "number"
-    ) {
-      globalThis.Deno.unrefTimer(timer);
-    } else if (checkMethod(timer, "unref")) {
-      (timer as { unref: () => void }).unref();
-    }
-  } catch {
-    //
-  }
 };
 
 const normalizeOptions = (options?: RetryOptions): DefaultRetryOptions => {
   const withDefaults = { ...optionsDefaults, ...(options ?? {}) };
 
   if (withDefaults.maxRetries < 1) withDefaults.maxRetries = 1;
-  if (withDefaults.retryDelay < 0) withDefaults.retryDelay = 0;
-  if (!withDefaults.unrefRetryDelay) withDefaults.unrefRetryDelay = false;
 
   return withDefaults;
 };
@@ -57,58 +23,35 @@ const normalizeOptions = (options?: RetryOptions): DefaultRetryOptions => {
 export const retry = (
   options?: RetryOptions,
 ): Composer => {
-  const { maxRetries, shouldRetry, retryDelay, unrefRetryDelay } =
-    normalizeOptions(options);
+  const { maxRetries, shouldRetry } = normalizeOptions(options);
 
-  return (fetchImpl) => async (input, init) => {
+  return (fetchImpl) => {
     let currentTry = 0;
-    let response: Response | undefined;
-    let error: Error | undefined;
-    const timers: number[] = [];
 
-    do {
-      response = undefined;
-      error = undefined;
-      currentTry += 1;
+    return async (input, init) => {
+      let response: Response | undefined;
+      let error: Error | undefined;
 
-      // Apply delay on retries and if retry delay is not 0 and the request was not aborted.
-      if (currentTry > 1 && retryDelay > 0 && !(init?.signal?.aborted)) {
-        await new Promise<void>((resolve) => {
-          const onAbort = () => {
-            resolve();
-            clearTimeout(i);
-          };
+      do {
+        response = undefined;
+        error = undefined;
+        currentTry += 1;
 
-          const i = setTimeout(() => {
-            init?.signal?.removeEventListener("abort", onAbort);
+        try {
+          response = await fetchImpl(input, init);
+        } catch (err) {
+          error = err;
+        }
+      } while (shouldRetry({ error, response }) && currentTry < maxRetries);
 
-            resolve();
-          }, retryDelay);
-
-          timers.push(i);
-
-          if (unrefRetryDelay) unrefTimer(i);
-
-          init?.signal?.addEventListener("abort", onAbort, { once: true });
-        });
+      // Only throw max retries error if the max retries allows more than one request.
+      if (maxRetries > 1 && currentTry >= maxRetries) {
+        throw new Error(`Max retries of "${maxRetries}" reached`);
       }
 
-      try {
-        response = await fetchImpl(input, init);
-      } catch (err) {
-        error = err;
-      }
-    } while (shouldRetry({ error, response }) && currentTry < maxRetries);
+      if (error) throw error;
 
-    timers.forEach((timer) => clearTimeout(timer));
-
-    // Only throw max retries error if the max retries allows more than one request.
-    if (maxRetries > 1 && currentTry >= maxRetries) {
-      throw new Error(`Max retries of "${maxRetries}" reached`);
-    }
-
-    if (error) throw error;
-
-    return response!;
+      return response!;
+    };
   };
 };

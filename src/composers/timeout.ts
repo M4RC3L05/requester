@@ -1,8 +1,8 @@
 import type { Composer } from "../types.ts";
 
 export const timeout =
-  (options: { ms: number }): Composer => (fetchImpl) => (input, init) => {
-    const timeoutSignal = AbortSignal.timeout(options.ms);
+  ({ ms }: { ms: number }): Composer => (fetchImpl) => (input, init) => {
+    const timeoutSignal = AbortSignal.timeout(ms);
     let clonedInit = init ? { ...init } : init;
 
     if (clonedInit) {

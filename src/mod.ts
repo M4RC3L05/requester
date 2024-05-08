@@ -14,12 +14,12 @@ export class Requester<F extends Fetch = Fetch> {
     return this;
   }
 
-  build(): F {
-    if (this.#composers.length <= 0) return this.#fetchImpl;
+  fetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+    if (this.#composers.length <= 0) return this.#fetchImpl(input, init);
 
     return this.#composers.reduce(
       (acc, curr) => curr(acc),
       this.#fetchImpl,
-    );
+    )(input, init);
   }
 }

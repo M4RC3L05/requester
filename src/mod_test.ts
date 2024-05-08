@@ -31,11 +31,11 @@ describe("Requester", () => {
     const requester = new Requester(fetchSpy as any).with(
       composerOne,
       composerTwo,
-    ).build();
+    );
 
-    const response = await requester("foo");
+    const response = await requester.fetch("foo");
 
     assertEquals(stack, [2, 1, 3]);
-    assertEquals(response, "foo");
+    assertEquals(response, "foo" as any);
   });
 });
