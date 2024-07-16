@@ -2,8 +2,9 @@
   "name": "@m4rc3l05/requester",
   "version": "0.4.0",
   "tasks": {
-    "deps:lock": "deno cache --lock=deno.lock --lock-write src/*.ts src/**/*.ts",
-    "deps": "deno cache --reload --lock=deno.lock src/*.ts src/**/*.ts"
+    "deps:check": "deno cache --frozen src/*.ts src/**/*.ts",
+    "deps:lock": "deno cache --frozen=false src/*.ts src/**/*.ts",
+    "deps": "deno cache --reload src/*.ts src/**/*.ts"
   },
   "exports": {
     ".": "./src/mod.ts",
