@@ -23,3 +23,5 @@ export class Requester<F extends Fetch = Fetch> {
     )(input, init);
   }
 }
+
+export type { Composer, Fetch };

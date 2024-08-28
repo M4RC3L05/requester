@@ -1,4 +1,4 @@
-import type { Composer } from "../types.ts";
+import type { Composer, Fetch } from "../types.ts";
 
 type RetryOptions = {
   shouldRetry?: (data: { response?: Response; error?: Error }) => boolean;
@@ -20,15 +20,15 @@ const normalizeOptions = (options?: RetryOptions): DefaultRetryOptions => {
   return withDefaults;
 };
 
-export const retry = (
+export const retry = <F extends Fetch = Fetch>(
   options?: RetryOptions,
-): Composer => {
+): Composer<F> => {
   const { maxRetries, shouldRetry } = normalizeOptions(options);
 
   return (fetchImpl) => {
     let currentTry = 0;
 
-    return async (input, init) => {
+    return (async (input, init) => {
       let response: Response | undefined;
       let error: Error | undefined;
       const errors = [] as Error[];
@@ -57,6 +57,6 @@ export const retry = (
       if (error) throw error;
 
       return response!;
-    };
+    }) as F;
   };
 };

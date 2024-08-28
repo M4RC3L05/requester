@@ -1,4 +1,4 @@
-import type { Composer } from "../types.ts";
+import type { Composer, Fetch } from "../types.ts";
 
 type DelayOptions = {
   unref?: boolean;
@@ -35,31 +35,34 @@ const normalizeOptions = (options: DelayOptions): NormalizedOptions => {
   return normalized as NormalizedOptions;
 };
 
-export const delay = (options: DelayOptions): Composer => {
+export const delay = <F extends Fetch = Fetch>(
+  options: DelayOptions,
+): Composer<F> => {
   const { ms, unref } = normalizeOptions(options);
 
-  return (fetchImpl) => async (input, init) => {
-    let timer: number | undefined;
+  return (fetchImpl) =>
+    (async (input, init) => {
+      let timer: number | undefined;
 
-    await new Promise<void>((resolve) => {
-      const onAbort = () => {
-        resolve();
-        clearTimeout(timer);
-      };
+      await new Promise<void>((resolve) => {
+        const onAbort = () => {
+          resolve();
+          clearTimeout(timer);
+        };
 
-      timer = setTimeout(() => {
-        init?.signal?.removeEventListener("abort", onAbort);
+        timer = setTimeout(() => {
+          init?.signal?.removeEventListener("abort", onAbort);
 
-        resolve();
-      }, ms);
+          resolve();
+        }, ms);
 
-      if (unref) unrefTimer(timer);
+        if (unref) unrefTimer(timer);
 
-      init?.signal?.addEventListener("abort", onAbort, { once: true });
-    });
+        init?.signal?.addEventListener("abort", onAbort, { once: true });
+      });
 
-    clearTimeout(timer);
+      clearTimeout(timer);
 
-    return fetchImpl(input, init);
-  };
+      return fetchImpl(input, init);
+    }) as F;
 };
