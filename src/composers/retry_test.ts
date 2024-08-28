@@ -1,5 +1,12 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals, describe, fail, it, spy } from "../test_deps.ts";
+import {
+  assertEquals,
+  assertInstanceOf,
+  describe,
+  fail,
+  it,
+  spy,
+} from "../test_deps.ts";
 import { retry } from "./mod.ts";
 
 describe("retry()", () => {
@@ -28,7 +35,9 @@ describe("retry()", () => {
 
       fail("it should have thown");
     } catch (e) {
+      assertInstanceOf(e, AggregateError);
       assertEquals(e.message, 'Max retries of "5" reached');
+      e.errors.forEach((error) => assertEquals(error.message, "foo"));
       assertEquals(fetchSpy.calls.length, 5);
     }
   });

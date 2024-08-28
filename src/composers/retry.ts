@@ -31,6 +31,7 @@ export const retry = (
     return async (input, init) => {
       let response: Response | undefined;
       let error: Error | undefined;
+      const errors = [] as Error[];
 
       do {
         response = undefined;
@@ -41,12 +42,16 @@ export const retry = (
           response = await fetchImpl(input, init);
         } catch (err) {
           error = err;
+          errors.push(err);
         }
       } while (shouldRetry({ error, response }) && currentTry < maxRetries);
 
       // Only throw max retries error if the max retries allows more than one request.
       if (maxRetries > 1 && currentTry >= maxRetries) {
-        throw new Error(`Max retries of "${maxRetries}" reached`);
+        throw new AggregateError(
+          errors,
+          `Max retries of "${maxRetries}" reached`,
+        );
       }
 
       if (error) throw error;
